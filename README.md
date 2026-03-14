@@ -25,9 +25,19 @@ npm install
 
 6.พิมพ์คำสั่งเพื่อรันเซิร์ฟเวอร์แอปพลิเคชัน:
 
-npx expo start
+npm install
 
-npx expo install expo-location 
+npx expo install expo-location react-native-maps
+
+npx expo install expo-image-picker
+
+npx expo install react-native-chart-kit react-native-svg
+
+npm install -g expo-cli
+
+expo install react-native-chart-kit react-native-svg
+
+npx expo start
 
 **สำหรับเเก้ GPS ที่ไปปักหมุดที่อื่น**
 ไปที่สามจุด -> setting -> location -> Search ใส่พิกัดเข้าไป -> save location
