@@ -1,441 +1,855 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  FlatList,
   Image,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  Modal
+  View
 } from 'react-native';
 
-/* -------------------- CARD COMPONENT -------------------- */
+// ==========================================
+// Mock Data
+// ==========================================
+const TASKS = [
+  {
+    id: '1',
+    room: 'B-402',
+    dorm: 'สุรนิเวศ 1',
+    issue: 'ท่อน้ำรั่วในห้องน้ำ',
+    time: '10 นาทีที่แล้ว',
+    category: 'ประปา',
+    status: 'รอดำเนินการ',
+    studentId: 'B670001',
+    phone: '091-123-4567',
+    images: ['https://i.imgur.com/8Km9tLL.jpg', 'https://i.imgur.com/jNNT4LE.jpg'],
+  },
+  {
+    id: '2',
+    room: 'A-105',
+    dorm: 'สุรนิเวศ 7',
+    issue: 'แอร์ไม่เย็น มีน้ำหยด',
+    time: '1 ชม.ที่แล้ว',
+    category: 'เครื่องใช้ไฟฟ้า',
+    status: 'กำลังซ่อม',
+    studentId: 'B670002',
+    phone: '089-555-7777',
+    images: ['https://i.imgur.com/8Km9tLL.jpg'],
+  },
+  {
+    id: '3',
+    room: 'C-301',
+    dorm: 'สุรนิเวศ 14',
+    issue: 'ขาเตียงหัก',
+    time: '2 ชม.ที่แล้ว',
+    category: 'เฟอร์นิเจอร์',
+    status: 'รอดำเนินการ',
+    studentId: 'B670003',
+    phone: '081-222-3333',
+    images: [],
+  },
+  {
+    id: '4',
+    room: 'B-102',
+    dorm: 'สุรนิเวศ 8',
+    issue: 'หลอดไฟทางเดินเสีย',
+    time: '3 ชม.ที่แล้ว',
+    category: 'ไฟฟ้า',
+    status: 'เสร็จสิ้น',
+    studentId: 'B670004',
+    phone: '080-999-8888',
+    images: ['https://i.imgur.com/jNNT4LE.jpg'],
+  },
+];
 
-function RepairCard({ title, room, problem, type, status, time }: any) {
-  const statusColor: any = {
-    urgent: "#EF4444",
-    normal: "#9CA3AF",
-    repair: "#F59E0B",
-    done: "#22C55E"
-  };
-
-  const statusText: any = {
-    urgent: "เร่งด่วน",
-    normal: "ปกติ",
-    repair: "กำลังซ่อม",
-    done: "ซ่อมแล้ว"
-  };
-
-  const iconType: any = {
-    ประปา: "water-outline",
-    ไฟฟ้า: "flash-outline",
-    ทั่วไป: "construct-outline"
-  };
-
-  return (
-    <View style={[styles.card, { borderLeftColor: statusColor[status] }]}>
-      <View style={styles.cardRow}>
-        {/* icon */}
-        <View style={styles.iconBox}>
-          <Ionicons
-            name={iconType[type] || "construct-outline"}
-            size={26}
-            color="#6B7280"
-          />
-        </View>
-
-        {/* content */}
-        <View style={{ flex: 1 }}>
-          {/* header */}
-          <View style={styles.headerRow}>
-            <View>
-              <Text style={styles.cardTitle}>{title}</Text>
-              <Text style={styles.cardSub}>เลขห้อง: {room}</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: statusColor[status] }]}>
-              <Text style={styles.badgeText}>{statusText[status]}</Text>
-            </View>
-          </View>
-
-          {/* problem & type tag (บนเส้น) */}
-          <View style={styles.problemRow}>
-            <Text style={styles.cardProblem}>{problem}</Text>
-            <View style={styles.typeTag}>
-              <Ionicons name="construct" size={12} color="#4B5563" style={{ marginRight: 4 }} />
-              <Text style={styles.typeText}>{type}</Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* bottom (ล่างเส้น) */}
-          <View style={styles.bottomRow}>
-            <Text style={styles.timeText}>{time}</Text>
-            <View style={styles.statusBtn}>
-              <Text style={styles.statusText}>{statusText[status]}</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-/* -------------------- MAIN SCREEN -------------------- */
+const STATUS_TABS = ['ทั้งหมด', 'รอดำเนินการ', 'กำลังซ่อม', 'เสร็จสิ้น'];
+const DATE_OPTIONS = ['ทั้งหมด', 'วันนี้', 'เมื่อวาน', '7 วันที่ผ่านมา'];
+const CATEGORY_OPTIONS = ['ทั้งหมด', 'ประปา', 'ไฟฟ้า', 'เฟอร์นิเจอร์', 'เครื่องใช้ไฟฟ้า', 'อื่นๆ'];
+const FEMALE_DORMS = ['สุรนิเวศ 1', 'สุรนิเวศ 2', 'สุรนิเวศ 3', 'สุรนิเวศ 4', 'สุรนิเวศ 5', 'สุรนิเวศ 6', 'สุรนิเวศ 14', 'สุรนิเวศ 15', 'สุรนิเวศ 16', 'สุรนิเวศ 18'];
+const MALE_DORMS = ['สุรนิเวศ 7', 'สุรนิเวศ 8', 'สุรนิเวศ 9', 'สุรนิเวศ 10', 'สุรนิเวศ 11', 'สุรนิเวศ 12', 'สุรนิเวศ 13', 'สุรนิเวศ 17'];
 
 export default function AdminDashboardScreen() {
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState("all");
-  const [imageViewer, setImageViewer] = useState(false);
+  const [activeTab, setActiveTab] = useState('ทั้งหมด');
 
-  const repairs = [
-    {
-      title: "หอพัก:สุรนิเวศ1",
-      room: "B-402",
-      dorm: "สุรนิเวศ 1",
-      problem: "ท่อน้ำรั่ว ฝ้าเปียก",
-      type: "ประปา",
-      status: "done",
-      time: "วันนี้",
-      studentId: "B670001",
-      phone: "091-123-4567",
-      images: [
-        "https://i.imgur.com/8Km9tLL.jpg",
-        "https://i.imgur.com/jNNT4LE.jpg"
-      ]
-    },
-    {
-      title: "หอพัก:สุรนิเวศ2",
-      room: "C-201",
-      dorm: "สุรนิเวศ 2",
-      problem: "เตารีดเสีย",
-      type: "ไฟฟ้า",
-      status: "repair",
-      time: "วันนี้",
-      studentId: "B670002",
-      phone: "089-555-7777",
-      images: [
-        "https://i.imgur.com/8Km9tLL.jpg",
-        "https://i.imgur.com/jNNT4LE.jpg"
-      ]
-    }
-  ];
+  // Filter States
+  const [selectedDate, setSelectedDate] = useState('ทั้งหมด');
+  const [selectedDorm, setSelectedDorm] = useState('ทั้งหมด');
+  const [selectedCategory, setSelectedCategory] = useState('ทั้งหมด');
 
-  const [dateFilter, setDateFilter] = useState("ทั้งหมด");
-  const [dormFilter, setDormFilter] = useState("ทั้งหมด");
-  const [typeFilter, setTypeFilter] = useState("ทั้งหมด");
+  // Modal Control States
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [filterType, setFilterType] = useState<'date' | 'dorm' | 'category'>('date');
 
-  const [openFilter, setOpenFilter] = useState<string | null>(null);
-  const [selectedRepair, setSelectedRepair] = useState<any>(null);
+  // Detail Pop-up States
   const [openDetail, setOpenDetail] = useState(false);
+  const [selectedRepair, setSelectedRepair] = useState<any>(null);
+  
+  // Image Viewer States
+  const [imageViewer, setImageViewer] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  const filteredRepairs = repairs.filter(item => {
-    const matchTab = activeTab === "all" || item.status === activeTab;
-    const matchDorm = dormFilter === "ทั้งหมด" || item.dorm === dormFilter;
-    const matchType = typeFilter === "ทั้งหมด" || item.type === typeFilter;
-    const matchDate = dateFilter === "ทั้งหมด" || item.time === dateFilter;
-    return matchTab && matchDorm && matchType && matchDate;
-  });
+  const getFilterOptions = () => {
+    if (filterType === 'date') return DATE_OPTIONS;
+    if (filterType === 'category') return CATEGORY_OPTIONS;
+    return [];
+  };
+
+  const getFilterTitle = () => {
+    if (filterType === 'date') return 'เลือกวันที่';
+    if (filterType === 'dorm') return 'เลือกหอพัก';
+    if (filterType === 'category') return 'เลือกประเภท';
+    return '';
+  };
+
+  const getCurrentSelection = () => {
+    if (filterType === 'date') return selectedDate;
+    if (filterType === 'dorm') return selectedDorm;
+    if (filterType === 'category') return selectedCategory;
+    return '';
+  };
+
+  const handleSelectFilter = (item: string) => {
+    if (filterType === 'date') setSelectedDate(item);
+    if (filterType === 'dorm') setSelectedDorm(item);
+    if (filterType === 'category') setSelectedCategory(item);
+    setFilterModalVisible(false);
+  };
+
+  const getCategoryConfig = (category: string) => {
+    switch (category) {
+      case 'ประปา': return { icon: 'water', color: '#0EA5E9', bg: '#E0F2FE' };
+      case 'ไฟฟ้า': return { icon: 'flash', color: '#EAB308', bg: '#FEF9C3' };
+      case 'เฟอร์นิเจอร์': return { icon: 'bed', color: '#8B5CF6', bg: '#EDE9FE' };
+      case 'เครื่องใช้ไฟฟ้า': return { icon: 'tv', color: '#EC4899', bg: '#FCE7F3' };
+      default: return { icon: 'build', color: '#6B7280', bg: '#F3F4F6' };
+    }
+  };
+
+  const safeCategory = selectedRepair?.category || selectedRepair?.type || 'ทั่วไป';
+  const repairConfig = getCategoryConfig(safeCategory);
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* HEADER */}
+      
       <View style={styles.header}>
         <View style={styles.logoRow}>
-          <Image
-            source={require('../../../assets/images/logo.png')}
-            style={styles.logoImage}
-          />
+          <Image source={require('../../../assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
           <View>
             <Text style={styles.appName}>SUT FixIt</Text>
             <Text style={styles.appSubtitle}>ผู้ดูแลระบบ (Admin)</Text>
           </View>
         </View>
-
-        <TouchableOpacity
-          style={styles.notificationBtn}
-          onPress={() => router.push("/(admin)/notifications")}
-        >
-          <Ionicons name="notifications-outline" size={24} color="#111827" />
+        <TouchableOpacity style={styles.notificationBtn} activeOpacity={0.7} onPress={() => router.push('/(admin)/notifications' as any)}>
+          <Ionicons name="notifications-outline" size={24} color="#111" />
           <View style={styles.notificationBadge} />
         </TouchableOpacity>
       </View>
 
-      {/* TABS */}
-      <View style={styles.tabs}>
-        <TouchableOpacity onPress={() => setActiveTab("all")}>
-          <Text style={activeTab === "all" ? styles.activeTab : styles.tab}>รายการทั้งหมด</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab("urgent")}>
-          <Text style={activeTab === "urgent" ? styles.activeTab : styles.tab}>เร่งด่วน</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab("repair")}>
-          <Text style={activeTab === "repair" ? styles.activeTab : styles.tab}>กำลังซ่อม</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab("done")}>
-          <Text style={activeTab === "done" ? styles.activeTab : styles.tab}>เสร็จแล้ว</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* FILTER */}
-      <View style={styles.filterRow}>
-        <View>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setOpenFilter(openFilter === "date" ? null : "date")}>
-            <Text style={styles.filterText}>{dateFilter} ▼</Text>
-          </TouchableOpacity>
-          {openFilter === "date" && (
-            <View style={styles.dropdown}>
-              {["ทั้งหมด", "วันนี้", "เมื่อวาน", "7 วันที่ผ่านมา"].map(i => (
-                <TouchableOpacity key={i} onPress={() => { setDateFilter(i); setOpenFilter(null); }}>
-                  <Text style={styles.dropdownItem}>{i}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
+        <View style={styles.pageHeader}>
+          <Text style={styles.pageTitle}>จัดการคำร้องแจ้งซ่อม</Text>
         </View>
 
-        <View>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setOpenFilter(openFilter === "dorm" ? null : "dorm")}>
-            <Text style={styles.filterText}>{dormFilter} ▼</Text>
-          </TouchableOpacity>
-          {openFilter === "dorm" && (
-            <View style={styles.dropdown}>
-              {["ทั้งหมด", "สุรนิเวศ 1", "สุรนิเวศ 2", "สุรนิเวศ 3", "สุรนิเวศ 4"].map(i => (
-                <TouchableOpacity key={i} onPress={() => { setDormFilter(i); setOpenFilter(null); }}>
-                  <Text style={styles.dropdownItem}>{i}</Text>
+        <View style={styles.tabContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+            {STATUS_TABS.map((tab) => {
+              const isActive = activeTab === tab;
+              return (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tabBtn, isActive ? styles.tabBtnActive : null]}
+                  onPress={() => setActiveTab(tab)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.tabText, isActive ? styles.tabTextActive : null]}>{tab}</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-          )}
+              );
+            })}
+          </ScrollView>
         </View>
 
-        <View>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setOpenFilter(openFilter === "type" ? null : "type")}>
-            <Text style={styles.filterText}>{typeFilter} ▼</Text>
+        <View style={styles.filterRow}>
+          <TouchableOpacity style={[styles.filterDropdown, selectedDate !== 'ทั้งหมด' ? styles.filterDropdownActive : null]} activeOpacity={0.7} onPress={() => { setFilterType('date'); setFilterModalVisible(true); }}>
+            <Text style={[styles.filterText, selectedDate !== 'ทั้งหมด' ? styles.filterTextActive : null]} numberOfLines={1}>{selectedDate === 'ทั้งหมด' ? 'วันที่' : selectedDate}</Text>
+            <Ionicons name="chevron-down" size={14} color={selectedDate !== 'ทั้งหมด' ? '#F28C28' : '#6B7280'} />
           </TouchableOpacity>
-          {openFilter === "type" && (
-            <View style={styles.dropdown}>
-              {["ทั้งหมด", "ประปา", "ไฟฟ้า", "ทั่วไป"].map(i => (
-                <TouchableOpacity key={i} onPress={() => { setTypeFilter(i); setOpenFilter(null); }}>
-                  <Text style={styles.dropdownItem}>{i}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-      </View>
 
-      {/* CONTENT */}
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.sectionTitle}>
-          <Text style={styles.sectionText}>📋 จัดการคำร้องแจ้งซ่อม</Text>
+          <TouchableOpacity style={[styles.filterDropdown, selectedDorm !== 'ทั้งหมด' ? styles.filterDropdownActive : null]} activeOpacity={0.7} onPress={() => { setFilterType('dorm'); setFilterModalVisible(true); }}>
+            <Text style={[styles.filterText, selectedDorm !== 'ทั้งหมด' ? styles.filterTextActive : null]} numberOfLines={1}>{selectedDorm === 'ทั้งหมด' ? 'หอพัก' : selectedDorm}</Text>
+            <Ionicons name="chevron-down" size={14} color={selectedDorm !== 'ทั้งหมด' ? '#F28C28' : '#6B7280'} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.filterDropdown, selectedCategory !== 'ทั้งหมด' ? styles.filterDropdownActive : null]} activeOpacity={0.7} onPress={() => { setFilterType('category'); setFilterModalVisible(true); }}>
+            <Text style={[styles.filterText, selectedCategory !== 'ทั้งหมด' ? styles.filterTextActive : null]} numberOfLines={1}>{selectedCategory === 'ทั้งหมด' ? 'ประเภท' : selectedCategory}</Text>
+            <Ionicons name="chevron-down" size={14} color={selectedCategory !== 'ทั้งหมด' ? '#F28C28' : '#6B7280'} />
+          </TouchableOpacity>
         </View>
 
-        {filteredRepairs.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            onPress={() => {
-              setSelectedRepair(item);
-              setOpenDetail(true);
-            }}
-          >
-            <RepairCard
-              title={`หอพัก:${item.dorm}`}
-              room={item.room}
-              problem={item.problem}
-              type={item.type}
-              status={item.status}
-              time={item.time}
-            />
-          </TouchableOpacity>
-        ))}
+        <View style={styles.listContainer}>
+          {TASKS.map((task: any) => {
+            const taskCategory = task?.category || task?.type || 'ทั่วไป';
+            const taskDorm = task?.dorm || 'ไม่ระบุ';
+            const taskRoom = task?.room || 'ไม่ระบุ';
+            const taskIssue = task?.issue || task?.problem || 'ไม่ระบุปัญหา';
+            const taskTime = task?.time || 'ไม่ระบุ';
+            const taskStatus = task?.status || 'รอดำเนินการ';
 
-        {/* MODAL DETAIL (อิงตามเลย์เอาต์หน้า History) */}
-        <Modal visible={openDetail} animationType="slide" transparent={true}>
-          <View style={styles.modalBg}>
-            <View style={styles.detailBox}>
-              <View style={styles.detailHeader}>
-                <TouchableOpacity onPress={() => setOpenDetail(false)}>
-                  <Ionicons name="chevron-back" size={26} color="#111827" />
-                </TouchableOpacity>
-                <Text style={styles.detailTitle}>รายละเอียดคำร้องแจ้งซ่อม</Text>
-              </View>
+            if (activeTab !== 'ทั้งหมด' && activeTab !== taskStatus) return null;
+            if (selectedCategory !== 'ทั้งหมด' && selectedCategory !== taskCategory) return null;
+            if (selectedDorm !== 'ทั้งหมด' && taskDorm !== selectedDorm) return null;
 
-              {selectedRepair && (
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  <View style={styles.roomRow}>
-                    <View style={styles.bigIcon}>
-                      <Ionicons name="water-outline" size={30} color="#6B7280" />
+            const catConfig = getCategoryConfig(taskCategory);
+            const statusColor = taskStatus === 'เสร็จสิ้น' ? '#10B981' : (taskStatus === 'กำลังซ่อม' ? '#3B82F6' : '#F59E0B');
+
+            return (
+              <TouchableOpacity 
+                key={task.id} 
+                style={styles.ticketCard} 
+                activeOpacity={0.7} 
+                onPress={() => {
+                  setSelectedRepair(task);
+                  setOpenDetail(true);
+                }}
+              >
+                <View style={[styles.urgencyIndicator, { backgroundColor: catConfig.color }]} />
+                <View style={styles.ticketContent}>
+                  
+                  <View style={styles.ticketHeader}>
+                    <View style={[styles.badge, { backgroundColor: catConfig.bg }]}>
+                      <Ionicons name={catConfig.icon as any} size={14} color={catConfig.color} />
+                      <Text style={[styles.badgeText, { color: catConfig.color }]}>{taskCategory}</Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.roomText}>เลขห้อง: {selectedRepair.room}</Text>
-                      <Text style={styles.dormText}>หอพัก: {selectedRepair.dorm}</Text>
-                      <Text style={styles.problemText}>{selectedRepair.problem}</Text>
-                    </View>
-                    <Text style={styles.urgentTag}>
-                      {selectedRepair.status === "urgent" && "เร่งด่วน"}
-                      {selectedRepair.status === "repair" && "กำลังซ่อม"}
-                      {selectedRepair.status === "done" && "ซ่อมแล้ว"}
-                      {selectedRepair.status === "normal" && "ปกติ"}
-                    </Text>
+                    <Text style={styles.timeText}>{taskTime}</Text>
                   </View>
 
-                  <View style={styles.line} />
-
-                  <View style={styles.userRow}>
-                    <View style={styles.avatar}>
-                      <Ionicons name="person" size={22} color="#fff" />
-                    </View>
-                    <View>
-                      <Text style={styles.userName}>รหัสนักศึกษา: {selectedRepair.studentId}</Text>
-                      <Text style={styles.userPhone}>เบอร์โทร {selectedRepair.phone}</Text>
-                    </View>
-                  </View>
-
+                  <Text style={styles.issueTitle} numberOfLines={1}>{taskIssue}</Text>
+                  
                   <View style={styles.locationRow}>
-                    <Ionicons name="home-outline" size={18} color="#6B7280" />
-                    <Text style={{ marginLeft: 8 }}>หอพัก A / 202 / ระบบประปา</Text>
+                    <Ionicons name="location" size={14} color="#9CA3AF" />
+                    <Text style={styles.locationText}>{taskDorm} ・ ห้อง {taskRoom}</Text>
                   </View>
 
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-                    {selectedRepair.images.map((img: string, index: number) => (
-                      <TouchableOpacity key={index} onPress={() => { setSelectedImage(img); setImageViewer(true); }}>
-                        <Image source={{ uri: img }} style={styles.galleryImage} />
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
+                  <View style={styles.divider} />
 
-                  <View style={styles.timeRow}>
-                    <Ionicons name="time-outline" size={18} color="#6B7280" />
-                    <Text style={{ marginLeft: 8 }}>แจ้งงาน - {selectedRepair.time}</Text>
-                  </View>
-
-                  <View style={styles.timeline}>
-                    <View style={styles.timelineRow}>
-                      <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
-                      <Text style={{ marginLeft: 8 }}>รับงาน</Text>
+                  <View style={styles.ticketFooter}>
+                    <View style={styles.statusRow}>
+                      <Text style={[styles.statusText, { color: statusColor }]}>
+                        สถานะ: {taskStatus}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.actionBtn}>
+                      <Text style={styles.actionText}>ดูรายละเอียด</Text>
+                      <Ionicons name="arrow-forward" size={16} color="#F28C28" />
                     </View>
                   </View>
-                </ScrollView>
-              )}
-            </View>
-          </View>
-        </Modal>
 
-        {/* IMAGE VIEWER */}
-        <Modal visible={imageViewer} transparent={true} animationType="fade">
-          <TouchableOpacity style={styles.imageModalBg} onPress={() => setImageViewer(false)}>
-            {selectedImage && <Image source={{ uri: selectedImage }} style={styles.fullImage} />}
-          </TouchableOpacity>
-        </Modal>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
       </ScrollView>
+
+      <Modal visible={openDetail} animationType="slide" transparent={true}>
+        <View style={styles.modalBg}>
+          <View style={styles.detailBox}>
+            
+            <View style={styles.detailHeader}>
+              <TouchableOpacity onPress={() => setOpenDetail(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+              <Text style={styles.detailTitle}>รายละเอียดแจ้งซ่อม</Text>
+              <View style={styles.spacer} />
+            </View>
+
+            {selectedRepair ? (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailScrollContent}>
+                
+                <View style={styles.detailCategoryRow}>
+                   <View style={[styles.badge, { backgroundColor: repairConfig.bg, paddingHorizontal: 12, paddingVertical: 6 }]}>
+                      <Ionicons name={repairConfig.icon as any} size={16} color={repairConfig.color} />
+                      <Text style={[styles.badgeText, { color: repairConfig.color, fontSize: 14 }]}>{safeCategory}</Text>
+                    </View>
+                    <Text style={[
+                      styles.detailStatusText,
+                      { color: selectedRepair?.status === 'เสร็จสิ้น' ? '#10B981' : (selectedRepair?.status === 'กำลังซ่อม' ? '#3B82F6' : '#F59E0B') }
+                    ]}>
+                      {selectedRepair?.status || 'รอดำเนินการ'}
+                    </Text>
+                </View>
+
+                <Text style={styles.detailIssueTitle}>
+                  {selectedRepair?.issue || selectedRepair?.problem || 'ไม่มีการระบุรายละเอียดปัญหา'}
+                </Text>
+
+                <View style={styles.detailInfoBox}>
+                  <View style={styles.detailInfoRow}>
+                     <Ionicons name="location-outline" size={20} color="#6B7280" />
+                     <View style={styles.detailInfoTextGroup}>
+                       <Text style={styles.detailInfoLabel}>สถานที่</Text>
+                       <Text style={styles.detailInfoValue}>{selectedRepair?.dorm || '-'} / ห้อง {selectedRepair?.room || '-'}</Text>
+                     </View>
+                  </View>
+                  
+                  <View style={styles.detailInfoDivider} />
+
+                  <View style={styles.detailInfoRow}>
+                     <Ionicons name="person-outline" size={20} color="#6B7280" />
+                     <View style={styles.detailInfoTextGroup}>
+                       <Text style={styles.detailInfoLabel}>ผู้แจ้ง (รหัสนักศึกษา)</Text>
+                       <Text style={styles.detailInfoValue}>{selectedRepair?.studentId || 'ไม่ระบุข้อมูล'}</Text>
+                     </View>
+                  </View>
+
+                  <View style={styles.detailInfoDivider} />
+
+                  <View style={styles.detailInfoRow}>
+                     <Ionicons name="call-outline" size={20} color="#6B7280" />
+                     <View style={styles.detailInfoTextGroup}>
+                       <Text style={styles.detailInfoLabel}>เบอร์โทรศัพท์</Text>
+                       <Text style={styles.detailInfoValue}>{selectedRepair?.phone || 'ไม่ระบุข้อมูล'}</Text>
+                     </View>
+                  </View>
+                </View>
+
+                {Array.isArray(selectedRepair?.images) && selectedRepair.images.length > 0 ? (
+                  <View style={styles.detailImageSection}>
+                    <Text style={styles.detailSectionTitle}>รูปภาพประกอบ</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageScrollContent}>
+                      {selectedRepair.images.map((img: string, index: number) => (
+                        <TouchableOpacity key={index} onPress={() => { setSelectedImage(img); setImageViewer(true); }} activeOpacity={0.8}>
+                          <Image source={{ uri: img }} style={styles.galleryImage} />
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : null}
+
+                <View style={styles.detailTimeContainer}>
+                  <Ionicons name="time-outline" size={16} color="#9CA3AF" />
+                  <Text style={styles.detailTimeText}>แจ้งเมื่อ: {selectedRepair?.time || 'ไม่ระบุ'}</Text>
+                </View>
+
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={imageViewer} transparent={true} animationType="fade">
+        <TouchableOpacity style={styles.imageModalBg} onPress={() => setImageViewer(false)} activeOpacity={1}>
+          <TouchableOpacity style={styles.closeImageBtn} onPress={() => setImageViewer(false)}>
+             <Ionicons name="close" size={28} color="#FFF" />
+          </TouchableOpacity>
+          {selectedImage ? <Image source={{ uri: selectedImage }} style={styles.fullImage} /> : null}
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal visible={filterModalVisible} transparent animationType="fade">
+        <TouchableOpacity style={styles.modalOverlayFilter} activeOpacity={1} onPress={() => setFilterModalVisible(false)}>
+          <View style={styles.modalContentFilter}>
+            <View style={styles.modalHeaderFilter}>
+              <Text style={styles.modalTitleFilter}>{getFilterTitle()}</Text>
+              <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {filterType === 'dorm' ? (
+              <ScrollView style={styles.dormScrollArea} showsVerticalScrollIndicator={false}>
+                <TouchableOpacity style={styles.modalItemFilter} onPress={() => handleSelectFilter('ทั้งหมด')}>
+                  <Text style={[styles.modalItemTextFilter, selectedDorm === 'ทั้งหมด' ? styles.modalItemTextFilterActive : null]}>ทั้งหมด</Text>
+                  {selectedDorm === 'ทั้งหมด' ? <Ionicons name="checkmark-circle" size={20} color="#F28C28" /> : null}
+                </TouchableOpacity>
+
+                <View style={styles.sectionHeaderContainer}>
+                  <Ionicons name="woman" size={16} color="#EC4899" />
+                  <Text style={[styles.sectionHeader, styles.femaleHeader]}>หอพักหญิง</Text>
+                </View>
+                {FEMALE_DORMS.map((dorm) => (
+                  <TouchableOpacity key={dorm} style={styles.modalSubItem} onPress={() => handleSelectFilter(dorm)}>
+                    <Text style={[styles.modalItemTextFilter, selectedDorm === dorm ? styles.modalItemTextFilterActive : null]}>{dorm}</Text>
+                    {selectedDorm === dorm ? <Ionicons name="checkmark-circle" size={20} color="#F28C28" /> : null}
+                  </TouchableOpacity>
+                ))}
+
+                <View style={styles.sectionHeaderContainer}>
+                  <Ionicons name="man" size={16} color="#3B82F6" />
+                  <Text style={[styles.sectionHeader, styles.maleHeader]}>หอพักชาย</Text>
+                </View>
+                {MALE_DORMS.map((dorm) => (
+                  <TouchableOpacity key={dorm} style={styles.modalSubItem} onPress={() => handleSelectFilter(dorm)}>
+                    <Text style={[styles.modalItemTextFilter, selectedDorm === dorm ? styles.modalItemTextFilterActive : null]}>{dorm}</Text>
+                    {selectedDorm === dorm ? <Ionicons name="checkmark-circle" size={20} color="#F28C28" /> : null}
+                  </TouchableOpacity>
+                ))}
+                <View style={styles.bottomSpacer} />
+              </ScrollView>
+            ) : (
+              <FlatList
+                data={getFilterOptions()}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => {
+                  const isSelected = getCurrentSelection() === item;
+                  return (
+                    <TouchableOpacity style={styles.modalItemFilter} onPress={() => handleSelectFilter(item)}>
+                      <Text style={[styles.modalItemTextFilter, isSelected ? styles.modalItemTextFilterActive : null]}>{item}</Text>
+                      {isSelected ? <Ionicons name="checkmark-circle" size={20} color="#F28C28" /> : null}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
-/* -------------------- STYLES -------------------- */
-
+// ==========================================
+// Styles
+// ==========================================
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F9FAFB" },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
   header: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingHorizontal: 20, paddingTop: Platform.OS === "android" ? 40 : 10,
-    paddingBottom: 15, backgroundColor: "#FFF", borderBottomWidth: 1, borderBottomColor: "#E5E7EB"
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 40 : 10,
+    paddingBottom: 15,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
-  logoRow: { flexDirection: "row", alignItems: "center" },
-  logoImage: { width: 44, height: 44, marginRight: 12 },
-  appName: { fontSize: 18, fontWeight: "800", color: "#111827" },
-  appSubtitle: { fontSize: 12, fontWeight: "600", color: "#F28C28" },
-  notificationBtn: { padding: 4 },
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    marginRight: 12,
+  },
+  appName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  appSubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#EF4444',
+    marginTop: 2,
+  },
+  notificationBtn: {
+    padding: 8,
+    position: 'relative',
+  },
   notificationBadge: {
-    position: "absolute", top: 4, right: 6, width: 10, height: 10,
-    backgroundColor: "#EF4444", borderRadius: 5, borderWidth: 1.5, borderColor: "#FFF"
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 10,
+    height: 10,
+    backgroundColor: '#EF4444',
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#FFF',
   },
-  tabs: {
-    flexDirection: "row", justifyContent: "space-around", borderBottomWidth: 1,
-    borderBottomColor: "#eee", paddingBottom: 10, marginTop: 20
+  scrollContent: {
+    paddingBottom: 40,
   },
-  tab: { color: "#777", fontWeight: "600", fontSize: 16 },
-  activeTab: {
-    color: "#F28C28", fontWeight: "bold", borderBottomWidth: 2,
-    borderBottomColor: "#F28C28", paddingBottom: 4, fontSize: 16
+  pageHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
-  filterRow: { flexDirection: "row", justifyContent: "space-around", marginVertical: 20, zIndex: 100 },
-  filterBtn: { backgroundColor: "#F2D7C4", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 25 },
-  filterText: { fontWeight: "600", color: "#C65A00" },
-  sectionTitle: { paddingHorizontal: 20, marginBottom: 10 },
-  sectionText: { fontSize: 20, fontWeight: "bold", color: "#111827" },
-  
-  /* --- STYLES สำหรับ CARD (ปรับตามรูป) --- */
-  card: {
-    backgroundColor: "#FFF", marginHorizontal: 20, marginBottom: 12, padding: 16,
-    borderRadius: 14, borderLeftWidth: 6, shadowColor: "#000",
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
   },
-  cardRow: { flexDirection: "row" },
-  iconBox: {
-    width: 60, height: 60, borderRadius: 10, backgroundColor: "#F3F4F6",
-    justifyContent: "center", alignItems: "center", marginRight: 14
+  tabContainer: {
+    marginBottom: 16,
   },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  cardTitle: { fontWeight: "bold", fontSize: 16, color: "#111827" },
-  cardSub: { color: "#6B7280", marginTop: 4, fontSize: 13 },
-  
-  problemRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
-  cardProblem: { color: "#374151", flex: 1, paddingRight: 10 },
-  
-  typeTag: {
-    flexDirection: "row", alignItems: "center", borderWidth: 1,
-    borderColor: "#E5E7EB", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4
+  tabScroll: {
+    paddingHorizontal: 20,
+    gap: 10,
   },
-  typeText: { color: "#4B5563", fontWeight: "600", fontSize: 12 },
-  
-  divider: { height: 1, backgroundColor: "#E5E7EB", marginVertical: 12 },
-  
-  bottomRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  timeText: { color: "#9CA3AF", fontSize: 12 },
-  statusBtn: { backgroundColor: "#FDE047", paddingHorizontal: 14, paddingVertical: 6, borderRadius: 12 },
-  statusText: { fontWeight: "bold", fontSize: 12, color: "#1F2937" },
-  
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginTop: -5 },
-  badgeText: { color: "#FFF", fontSize: 12, fontWeight: "bold" },
-  
-  dropdown: {
-    position: "absolute", top: 45, left: 0, backgroundColor: "#FFF",
-    borderRadius: 10, paddingVertical: 8, width: 140, elevation: 10, zIndex: 200
+  tabBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  dropdownItem: { paddingVertical: 8, paddingHorizontal: 12, fontSize: 14, color: "#374151" },
-  modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
-  detailBox: { width: "92%", backgroundColor: "#FFF", borderRadius: 20, padding: 16, maxHeight: '90%' },
-  detailHeader: { flexDirection: "row", alignItems: "center", marginBottom: 15 },
-  detailTitle: { fontSize: 16, fontWeight: "bold", marginLeft: 10, color: "#111827" },
-  roomRow: { flexDirection: "row", alignItems: "center" },
-  bigIcon: {
-    width: 55, height: 55, borderRadius: 10, backgroundColor: "#F3F4F6",
-    justifyContent: "center", alignItems: "center", marginRight: 10
+  tabBtnActive: {
+    backgroundColor: '#F28C28',
+    borderColor: '#E67E22',
   },
-  roomText: { fontWeight: "bold", fontSize: 15, color: "#111827" },
-  dormText: { color: "#6B7280" },
-  problemText: { marginTop: 3, color: "#374151" },
-  urgentTag: { color: "#EF4444", fontWeight: "bold" },
-  line: { height: 1, backgroundColor: "#E5E7EB", marginVertical: 12 },
-  userRow: { flexDirection: "row", alignItems: "center" },
-  avatar: {
-    width: 38, height: 38, borderRadius: 20, backgroundColor: "#F28C28",
-    justifyContent: "center", alignItems: "center", marginRight: 10
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
   },
-  userName: { fontWeight: "bold", color: "#111827" },
-  userPhone: { color: "#6B7280", fontSize: 12 },
-  locationRow: { flexDirection: "row", alignItems: "center", marginTop: 10 },
-  timeRow: { flexDirection: "row", alignItems: "center", marginTop: 10 },
-  timeline: { marginTop: 10 },
-  timelineRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
-  imageModalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" },
-  fullImage: { width: "95%", height: 400, resizeMode: "contain" },
-  galleryImage: { width: 140, height: 110, borderRadius: 10, marginRight: 10 }
+  tabTextActive: {
+    color: '#FFFFFF',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    gap: 10,
+  },
+  filterDropdown: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  filterDropdownActive: {
+    borderColor: '#F28C28',
+    backgroundColor: '#FFF3E8',
+  },
+  filterText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+    flex: 1,
+  },
+  filterTextActive: {
+    color: '#F28C28',
+  },
+  listContainer: {
+    paddingHorizontal: 20,
+  },
+  ticketCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    overflow: 'hidden',
+  },
+  urgencyIndicator: {
+    width: 6,
+    height: '100%',
+  },
+  ticketContent: {
+    flex: 1,
+    padding: 16,
+  },
+  ticketHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  timeText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  issueTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  locationText: {
+    fontSize: 13,
+    color: '#4B5563',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 14,
+  },
+  ticketFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#F28C28',
+  },
+  modalBg: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  detailBox: {
+    width: "90%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 20,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  detailHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  spacer: {
+    width: 32,
+  },
+  detailTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  detailScrollContent: {
+    paddingBottom: 20,
+  },
+  detailCategoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  detailStatusText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  detailIssueTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 24,
+    lineHeight: 30,
+  },
+  detailInfoBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginBottom: 24,
+  },
+  detailInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailInfoTextGroup: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  detailInfoLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  detailInfoValue: {
+    fontSize: 15,
+    color: '#111827',
+    fontWeight: '700',
+  },
+  detailInfoDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 12,
+    marginLeft: 32,
+  },
+  detailImageSection: {
+    marginBottom: 24,
+  },
+  detailSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  imageScrollContent: {
+    gap: 12,
+  },
+  galleryImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  detailTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  detailTimeText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  imageModalBg: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeImageBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 30,
+    right: 20,
+    padding: 8,
+    zIndex: 10,
+  },
+  fullImage: {
+    width: "100%",
+    height: "70%",
+    resizeMode: "contain",
+  },
+  modalOverlayFilter: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContentFilter: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 10,
+    maxHeight: '75%',
+  },
+  modalHeaderFilter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    marginBottom: 10,
+  },
+  modalTitleFilter: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modalItemFilter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalItemTextFilter: {
+    fontSize: 16,
+    color: '#4B5563',
+  },
+  modalItemTextFilterActive: {
+    color: '#F28C28',
+    fontWeight: '700',
+  },
+  dormScrollArea: {
+    width: '100%',
+  },
+  sectionHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 8,
+    gap: 8,
+  },
+  sectionHeader: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  femaleHeader: {
+    color: '#EC4899',
+  },
+  maleHeader: {
+    color: '#3B82F6',
+  },
+  modalSubItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    marginLeft: 10,
+  },
+  bottomSpacer: {
+    height: 20,
+  },
 });
