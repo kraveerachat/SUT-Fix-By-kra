@@ -10,6 +10,17 @@ import { getAuth } from 'firebase/auth';
 import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../constants/firebaseConfig'; 
 
+// ✅ ฟังก์ชันแปลงวันที่เป็นรูปแบบ "2 เม.ย. 2569"
+const formatThaiDate = (dateString: string) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const d = date.getDate();
+  const m = months[date.getMonth()];
+  const y = date.getFullYear() + 543;
+  return `${d} ${m} ${y}`;
+};
+
 export default function AdminHistoryScreen() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,7 +30,6 @@ export default function AdminHistoryScreen() {
   const [reporterInfo, setReporterInfo] = useState<any>(null);
   const [techInfo, setTechInfo] = useState<any>(null);
 
-  // ✅ State สำหรับแจ้งเตือน
   const [unreadCount, setUnreadCount] = useState(0);
   const [userData, setUserData] = useState<any>(null);
 
@@ -32,7 +42,6 @@ export default function AdminHistoryScreen() {
     let unsubUser = () => {};
     let unsubNotif = () => {};
 
-    // 1. ดึงงาน
     const qTasks = query(collection(db, "Reports"), where("status", "in", ["เสร็จสิ้น", "เสร็จสมบูรณ์", "Approved"]));
     unsubTasks = onSnapshot(qTasks, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -45,12 +54,10 @@ export default function AdminHistoryScreen() {
       setLoading(false);
     });
 
-    // 2. ดึงการตั้งค่า
     unsubUser = onSnapshot(doc(db, "Users", user.uid), (docSnap) => {
       if (docSnap.exists()) setUserData(docSnap.data());
     });
 
-    // 3. ดึงยอดแจ้งเตือน
     const qNotif = query(collection(db, "Notifications"), where("targetUid", "==", user.uid), where("isRead", "==", false));
     unsubNotif = onSnapshot(qNotif, (snapshot) => {
       setUnreadCount(snapshot.size);
@@ -125,7 +132,8 @@ export default function AdminHistoryScreen() {
               <TouchableOpacity key={task.id} style={styles.historyCard} onPress={() => handleOpenDetail(task)}>
                 <View style={styles.cardHeader}>
                   <View style={[styles.badge, { backgroundColor: config.bg }]}><Ionicons name={config.icon as any} size={14} color={config.color} /><Text style={[styles.badgeTextCategory, { color: config.color }]}>{task.category}</Text></View>
-                  <Text style={styles.dateText}>{task.createdAt ? new Date(task.createdAt).toLocaleDateString('th-TH', {day:'2-digit', month:'short', year:'2-digit'}) : '-'}</Text>
+                  {/* ✅ แก้ไขเวลาให้เป็นรูปแบบไทย */}
+                  <Text style={styles.dateText}>{task.createdAt ? formatThaiDate(task.createdAt) : '-'}</Text>
                 </View>
                 <Text style={styles.taskTitle}>{task.title}</Text>
                 <Text style={styles.locationText}>{task.dorm} ・ ห้อง {task.room}</Text>
@@ -227,7 +235,8 @@ export default function AdminHistoryScreen() {
                 )}
 
                 <View style={styles.timeFooter}>
-                  <Text style={styles.timeLabel}>ดำเนินการสำเร็จเมื่อ: {selectedRepair.closedAt || selectedRepair.approvedAt ? new Date(selectedRepair.closedAt || selectedRepair.approvedAt).toLocaleString('th-TH') : '-'}</Text>
+                  {/* ✅ แก้ไขเวลาให้เป็นรูปแบบไทย */}
+                  <Text style={styles.timeLabel}>ดำเนินการสำเร็จเมื่อ: {selectedRepair.closedAt || selectedRepair.approvedAt ? formatThaiDate(selectedRepair.closedAt || selectedRepair.approvedAt) : '-'}</Text>
                 </View>
               </ScrollView>
             )}

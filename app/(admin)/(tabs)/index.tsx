@@ -13,20 +13,29 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
-  Alert // ✅ เพิ่ม Alert
+  Alert 
 } from 'react-native';
 
 import { getAuth } from 'firebase/auth';
-// ✅ นำเข้า updateDoc เพิ่มเติม
-import { collection, query, where, onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../constants/firebaseConfig'; 
 
-// ✅ 1. เพิ่มแท็บ "รอตรวจสอบ" เข้ามาในระบบ
 const STATUS_TABS = ['ทั้งหมด', 'รอดำเนินการ', 'กำลังซ่อม', 'รอตรวจสอบ', 'เสร็จสิ้น'];
 const DATE_OPTIONS = ['ทั้งหมด', 'วันนี้', 'เมื่อวาน'];
 const CATEGORY_OPTIONS = ['ทั้งหมด', 'ประปา', 'ไฟฟ้า', 'เฟอร์นิเจอร์', 'เครื่องใช้ไฟฟ้า', 'อื่นๆ'];
 const FEMALE_DORMS = ['สุรนิเวศ 1', 'สุรนิเวศ 2', 'สุรนิเวศ 3', 'สุรนิเวศ 4', 'สุรนิเวศ 5', 'สุรนิเวศ 14', 'สุรนิเวศ 15'];
 const MALE_DORMS = ['สุรนิเวศ 7', 'สุรนิเวศ 8', 'สุรนิเวศ 9', 'สุรนิเวศ 13', 'สุรนิเวศ 17'];
+
+// ✅ ฟังก์ชันแปลงวันที่เป็นรูปแบบ "2 เม.ย. 2569"
+const formatThaiDate = (dateString: string) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const d = date.getDate();
+  const m = months[date.getMonth()];
+  const y = date.getFullYear() + 543;
+  return `${d} ${m} ${y}`;
+};
 
 export default function AdminDashboardScreen() {
   const [activeTab, setActiveTab] = useState('ทั้งหมด');
@@ -123,7 +132,6 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  // ✅ 2. ฟังก์ชันแอดมินกดอนุมัติงาน
   const handleApproveJob = async (jobId: string) => {
     Alert.alert("ยืนยันการอนุมัติ", "ตรวจสอบงานเรียบร้อยและต้องการปิดงานนี้ใช่หรือไม่?", [
       { text: "ยกเลิก", style: "cancel" },
@@ -133,11 +141,26 @@ export default function AdminDashboardScreen() {
           try {
             const docRef = doc(db, "Reports", jobId);
             await updateDoc(docRef, {
-              status: "เสร็จสิ้น", // อัปเดตให้เป็นเสร็จสิ้น User จะได้เห็นว่าเสร็จแล้ว
+              status: "เสร็จสิ้น",
               approvedAt: new Date().toISOString()
             });
+
+            const techId = selectedRepair?.techId || selectedRepair?.technicianId;
+            if (techId) {
+                await addDoc(collection(db, "Notifications"), {
+                    targetUid: techId,
+                    title: "แอดมินอนุมัติงานแล้ว ✅",
+                    body: `งานซ่อม "${selectedRepair.title}" ได้รับการอนุมัติและปิดจ๊อบเรียบร้อย`,
+                    isRead: false,
+                    type: "admin_approved",
+                    category: selectedRepair.category,
+                    jobId: selectedRepair.id,
+                    createdAt: serverTimestamp()
+                });
+            }
+
             Alert.alert("สำเร็จ", "อนุมัติงานเสร็จสิ้นเรียบร้อยแล้ว");
-            setOpenDetail(false); // ปิด Pop-up
+            setOpenDetail(false); 
           } catch (error) {
             Alert.alert("ผิดพลาด", "ไม่สามารถอนุมัติงานได้");
           }
@@ -167,7 +190,7 @@ export default function AdminDashboardScreen() {
     let matchStatus = activeTab === 'ทั้งหมด';
     if (activeTab === 'รอดำเนินการ') matchStatus = task.status === 'รอดำเนินการ';
     if (activeTab === 'กำลังซ่อม') matchStatus = (task.status === 'กำลังดำเนินการ' || task.status === 'กำลังซ่อม');
-    if (activeTab === 'รอตรวจสอบ') matchStatus = task.status === 'รอตรวจสอบ'; // ✅ เช็คเงื่อนไขแท็บ รอตรวจสอบ
+    if (activeTab === 'รอตรวจสอบ') matchStatus = task.status === 'รอตรวจสอบ'; 
     if (activeTab === 'เสร็จสิ้น') matchStatus = (task.status === 'เสร็จสิ้น' || task.status === 'เสร็จสมบูรณ์');
 
     const matchCat = selectedCategory === 'ทั้งหมด' || task.category === selectedCategory;
@@ -224,11 +247,10 @@ export default function AdminDashboardScreen() {
           {loading ? <ActivityIndicator size="large" color="#F28C28" style={{marginTop: 50}} /> : filteredTasks.map((task) => {
             const config = getCategoryConfig(task.category);
             
-            // ✅ เปลี่ยนสีสถานะให้เหมาะกับ 'รอตรวจสอบ'
-            let statusColor = '#F59E0B'; // สีส้ม (รอดำเนินการ)
-            if (task.status === 'กำลังดำเนินการ' || task.status === 'กำลังซ่อม') statusColor = '#3B82F6'; // สีฟ้า
-            if (task.status === 'รอตรวจสอบ') statusColor = '#8B5CF6'; // สีม่วง
-            if (task.status === 'เสร็จสิ้น' || task.status === 'เสร็จสมบูรณ์') statusColor = '#10B981'; // สีเขียว
+            let statusColor = '#F59E0B'; 
+            if (task.status === 'กำลังดำเนินการ' || task.status === 'กำลังซ่อม') statusColor = '#3B82F6'; 
+            if (task.status === 'รอตรวจสอบ') statusColor = '#8B5CF6'; 
+            if (task.status === 'เสร็จสิ้น' || task.status === 'เสร็จสมบูรณ์') statusColor = '#10B981'; 
 
             return (
               <TouchableOpacity key={task.id} style={styles.ticketCard} onPress={() => handleOpenDetail(task)}>
@@ -239,7 +261,8 @@ export default function AdminDashboardScreen() {
                       <Ionicons name={config.icon as any} size={14} color={config.color} />
                       <Text style={[styles.badgeText, { color: config.color }]}>{task.category}</Text>
                     </View>
-                    <Text style={styles.timeText}>{task.createdAt ? new Date(task.createdAt).toLocaleDateString('th-TH') : '-'}</Text>
+                    {/* ✅ แก้ไขเวลาให้เป็นรูปแบบไทย */}
+                    <Text style={styles.timeText}>{task.createdAt ? formatThaiDate(task.createdAt) : '-'}</Text>
                   </View>
                   <Text style={styles.issueTitle} numberOfLines={1}>{task.title}</Text>
                   <View style={styles.locationRow}>
@@ -276,7 +299,6 @@ export default function AdminDashboardScreen() {
                     <Text style={[styles.badgeText, { color: getCategoryConfig(selectedRepair.category).color }]}>{selectedRepair.category}</Text>
                   </View>
                   
-                  {/* เปลี่ยนสีสถานะใน Modal */}
                   <Text style={{
                     fontWeight:'800', 
                     color: (selectedRepair.status === 'เสร็จสิ้น' || selectedRepair.status === 'เสร็จสมบูรณ์') ? '#10B981' : 
@@ -327,25 +349,44 @@ export default function AdminDashboardScreen() {
                   </View>
                 </View>
                 
-                {((selectedRepair.images && selectedRepair.images.length > 0) || selectedRepair.image) && (
-                  <View style={{marginTop: 20}}>
-                    <Text style={styles.detailSectionTitle}>รูปภาพประกอบ</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 10}}>
-                      {selectedRepair.images && selectedRepair.images.length > 0 && selectedRepair.images.map((img: string, i: number) => (
-                        <TouchableOpacity key={i} onPress={() => { setSelectedImage(img); setImageViewer(true); }}>
-                          <Image source={{ uri: img }} style={styles.galleryImage} />
-                        </TouchableOpacity>
-                      ))}
-                      {selectedRepair.image && (!selectedRepair.images || selectedRepair.images.length === 0) && (
-                        <TouchableOpacity onPress={() => { setSelectedImage(selectedRepair.image); setImageViewer(true); }}>
-                          <Image source={{ uri: selectedRepair.image }} style={styles.galleryImage} />
-                        </TouchableOpacity>
-                      )}
+                <Text style={styles.detailSectionTitle}>รูปภาพก่อนซ่อม</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 10, marginBottom: 20}}>
+                  {selectedRepair.images && selectedRepair.images.length > 0 ? (
+                    selectedRepair.images.map((img: string, i: number) => (
+                      <TouchableOpacity key={i} onPress={() => { setSelectedImage(img); setImageViewer(true); }}>
+                        <Image source={{ uri: img }} style={styles.galleryImage} />
+                      </TouchableOpacity>
+                    ))
+                  ) : selectedRepair.image ? (
+                    <TouchableOpacity onPress={() => { setSelectedImage(selectedRepair.image); setImageViewer(true); }}>
+                      <Image source={{ uri: selectedRepair.image }} style={styles.galleryImage} />
+                    </TouchableOpacity>
+                  ) : <Text style={{color: '#9CA3AF', fontSize: 12, marginLeft: 10}}>ไม่มีรูปภาพก่อนซ่อม</Text>}
+                </ScrollView>
+
+                {(selectedRepair.status === 'รอตรวจสอบ' || selectedRepair.status === 'เสร็จสิ้น') && (
+                  <View style={{ marginTop: 10, padding: 15, backgroundColor: '#F0FDF4', borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#10B981' }}>
+                    <Text style={[styles.detailSectionTitle, { color: '#166534', marginTop: 0 }]}>🛠️ รายละเอียดหลังซ่อมเสร็จ</Text>
+                    <Text style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
+                      {selectedRepair.closingDetail || 'ไม่มีรายละเอียดการซ่อม'}
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#EF4444', marginBottom: 12 }}>
+                      ค่าวัสดุ: {selectedRepair.materialCost || 0} บาท
+                    </Text>
+                    
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#166534', marginBottom: 8 }}>รูปภาพหลังซ่อม:</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                      {selectedRepair.afterImages && selectedRepair.afterImages.length > 0 ? (
+                        selectedRepair.afterImages.map((img: string, i: number) => (
+                          <TouchableOpacity key={i} onPress={() => { setSelectedImage(img); setImageViewer(true); }}>
+                            <Image source={{ uri: img }} style={[styles.galleryImage, { borderColor: '#10B981', borderWidth: 2 }]} />
+                          </TouchableOpacity>
+                        ))
+                      ) : <Text style={{color: '#9CA3AF', fontSize: 12}}>ไม่มีรูปภาพหลังซ่อม</Text>}
                     </ScrollView>
                   </View>
                 )}
 
-                {/* ✅ 3. โชว์ปุ่ม "อนุมัติจบงาน" เฉพาะเมื่อสถานะคือ "รอตรวจสอบ" */}
                 {selectedRepair.status === 'รอตรวจสอบ' && (
                   <TouchableOpacity 
                     style={styles.approveButton}
@@ -396,7 +437,6 @@ const styles = StyleSheet.create({
   appSubtitle: { fontSize: 11, fontWeight: '600', color: '#EF4444', marginTop: 2 },
   notificationBtn: { padding: 8, position: 'relative' },
   notificationBadge: { position: 'absolute', top: 2, right: 2, minWidth: 18, height: 18, backgroundColor: '#EF4444', borderRadius: 9, borderWidth: 1.5, borderColor: '#FFF', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
-  badgeText: { color: '#FFF', fontSize: 9, fontWeight: 'bold' },
   scrollContent: { paddingBottom: 40 },
   pageHeader: { padding: 20 },
   pageTitle: { fontSize: 22, fontWeight: '800', color: '#111827' },
@@ -426,7 +466,7 @@ const styles = StyleSheet.create({
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionText: { fontSize: 14, fontWeight: '700', color: '#F28C28' },
   modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
-  detailBox: { width: "90%", backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, maxHeight: '85%' },
+  detailBox: { width: "95%", backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, maxHeight: '90%' },
   detailHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 20 },
   detailTitle: { fontSize: 18, fontWeight: "800" },
   detailCategoryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
@@ -438,14 +478,12 @@ const styles = StyleSheet.create({
   detailInfoValue: { fontSize: 14, fontWeight: '700', color: '#111827' },
   detailInfoDivider: { height: 1, backgroundColor: '#E5E7EB', marginVertical: 12 },
   galleryImage: { width: 120, height: 120, borderRadius: 12 },
-  
-  // ✅ สไตล์สำหรับปุ่มอนุมัติจบงาน
   approveButton: { backgroundColor: '#10B981', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 16, borderRadius: 14, marginTop: 24, marginBottom: 10, gap: 8, shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   approveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
-
   modalOverlayFilter: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalContentFilter: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '60%' },
   modalItemFilter: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   modalItemTextFilter: { fontSize: 16, textAlign: 'center' },
+  modalTitleFilter: { fontSize: 18, fontWeight: '800', textAlign: 'center', marginBottom: 15 },
   detailSectionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 10 }
 });

@@ -65,35 +65,47 @@ export default function NotificationScreen() {
         return () => unsubscribe();
     }, []);
 
-    // ✅ เปลี่ยนสีไอคอนตามหมวดหมู่
+    // ✅ เปลี่ยนสีและไอคอนให้ครบทุกสถานะการแจ้งเตือน
     const getIconConfig = (type: string, category?: string) => {
+        // จัดการตาม Type ของการแจ้งเตือน
         if (type === 'new_request') return { icon: 'warning', color: '#EF4444', bg: '#FDE8E8' };
         if (type === 'report_updated') return { icon: 'create', color: '#8B5CF6', bg: '#EDE9FE' };
+        if (type === 'admin_approved' || type === 'job_completed') return { icon: 'checkmark-done-circle', color: '#10B981', bg: '#D1FAE5' };
+        if (type === 'user_reviewed') return { icon: 'star', color: '#F59E0B', bg: '#FEF3C7' };
 
+        // จัดการตามหมวดหมู่งาน (กรณีเป็นงานทั่วไป)
         switch (category) {
             case 'ประปา': return { icon: 'water', color: '#3B82F6', bg: '#DBEAFE' };
             case 'ไฟฟ้า': return { icon: 'flash', color: '#EAB308', bg: '#FEF9C3' };
             case 'แอร์': return { icon: 'snow', color: '#06B6D4', bg: '#CFFAFE' };
+            case 'เฟอร์นิเจอร์': return { icon: 'bed', color: '#8B5CF6', bg: '#EDE9FE' };
+            case 'เครื่องใช้ไฟฟ้า': return { icon: 'tv', color: '#EC4899', bg: '#FCE7F3' };
             default: return { icon: 'build', color: '#F28C28', bg: '#FFF3E8' };
         }
     };
 
-    // ✅ กดที่แจ้งเตือนเพื่ออ่านและเด้งไปหน้างาน
+    // ✅ กดที่แจ้งเตือนเพื่ออ่านและเด้งไปถูกหน้า (ครบทุกเคส)
     const handlePressNotification = async (item: any) => {
         try {
             if (item.isUnread) {
                 await updateDoc(doc(db, "Notifications", item.id), { isRead: true });
             }
             if (item.jobId) {
-                // ถ้าเป็นงานใหม่ ให้ไปหน้ากดรับงาน | ถ้าเป็นงานอัปเดต ให้ไปหน้ากำลังซ่อม
+                // 1. งานใหม่ -> ไปหน้ารับงาน
                 if (item.type === "new_request") {
                     router.push({ pathname: '/(technician)/job-request-detail', params: { id: item.jobId } });
-                } else {
+                } 
+                // 2. งานเสร็จแล้ว/อนุมัติแล้ว/รีวิวแล้ว -> ไปหน้าประวัติ
+                else if (item.type === "admin_approved" || item.type === "job_completed" || item.type === "user_reviewed") {
+                    router.push({ pathname: '/(technician)/history-detail', params: { id: item.jobId } });
+                } 
+                // 3. งานอื่นๆ (กำลังซ่อม/อัปเดต) -> ไปหน้าดำเนินการ
+                else {
                     router.push({ pathname: '/(technician)/task-detail', params: { id: item.jobId } });
                 }
             }
         } catch (error) {
-            console.error(error);
+            console.error("Error opening notification:", error);
         }
     };
 
@@ -128,7 +140,9 @@ export default function NotificationScreen() {
                 </View>
                 <View style={styles.textContainer}>
                     <View style={styles.itemHeader}>
-                        <Text style={[styles.itemTitle, item.isUnread && styles.unreadText]}>{item.title}</Text>
+                        <Text style={[styles.itemTitle, item.isUnread && styles.unreadText]} numberOfLines={1}>
+                            {item.title}
+                        </Text>
                         <View style={styles.timeBadgeRow}>
                             <Text style={styles.itemTime}>{item.time}</Text>
                             {item.isUnread && <View style={styles.unreadDot} />}

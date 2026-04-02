@@ -1,8 +1,13 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Platform } from 'react-native';
+// ✅ 1. นำเข้าตัวจัดการขอบจอ
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; 
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets(); // ✅ 2. เรียกใช้งาน
+
   return (
     <Tabs
       screenOptions={{
@@ -10,9 +15,10 @@ export default function TabLayout() {
         tabBarActiveTintColor: '#F28C28',
         tabBarInactiveTintColor: '#A9B3C1',
         tabBarStyle: {
-          height: 64,
+          // ✅ 3. ให้มันบวกความสูงของปุ่มโฮมเครื่องนั้นๆ เข้าไปอัตโนมัติ
+          height: Platform.OS === 'ios' ? 85 : 65 + insets.bottom,
           paddingTop: 6,
-          paddingBottom: 8,
+          paddingBottom: Platform.OS === 'ios' ? 25 : (insets.bottom > 0 ? insets.bottom : 20),
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -28,7 +34,6 @@ export default function TabLayout() {
           ),
         }}
       />
-
       <Tabs.Screen
         name="history"
         options={{
@@ -38,7 +43,6 @@ export default function TabLayout() {
           ),
         }}
       />
-
       <Tabs.Screen
         name="notification"
         options={{
@@ -48,7 +52,6 @@ export default function TabLayout() {
           ),
         }}
       />
-
       <Tabs.Screen
         name="profile"
         options={{
@@ -58,7 +61,6 @@ export default function TabLayout() {
           ),
         }}
       />
-
       <Tabs.Screen
         name="explore"
         options={{

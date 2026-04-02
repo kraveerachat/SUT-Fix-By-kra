@@ -13,6 +13,17 @@ import { db } from '../../../constants/firebaseConfig';
 
 const STATUS_TABS = ['ทั้งหมด', 'รอตรวจงาน', 'กำลังซ่อม', 'เสร็จสิ้น'];
 
+// ✅ ฟังก์ชันแปลงวันที่เป็นรูปแบบ "2 เม.ย. 2569"
+const formatThaiDate = (dateString: string) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const d = date.getDate();
+  const m = months[date.getMonth()];
+  const y = date.getFullYear() + 543;
+  return `${d} ${m} ${y}`;
+};
+
 export default function AdminReviewScreen() {
   const [activeTab, setActiveTab] = useState('รอตรวจงาน');
   const [tasks, setTasks] = useState<any[]>([]); 
@@ -178,7 +189,8 @@ export default function AdminReviewScreen() {
                   <Text style={styles.locationTitle}>{task.dorm} ・ ห้อง {task.room}</Text>
                   <Text style={styles.issueTitle} numberOfLines={1}>{task.title}</Text>
                   <View style={styles.timeRow}>
-                    <Text style={styles.timeText}>อัปเดตเมื่อ {task.updatedAt || task.closedAt ? new Date(task.updatedAt || task.closedAt).toLocaleTimeString('th-TH') : '-'}</Text>
+                    {/* ✅ เรียกใช้ formatThaiDate ตรงนี้ */}
+                    <Text style={styles.timeText}>อัปเดตเมื่อ {task.updatedAt || task.closedAt ? formatThaiDate(task.updatedAt || task.closedAt) : '-'}</Text>
                     <Text style={[styles.statusSuccessText, task.status !== 'เสร็จสิ้น' && {color: '#F59E0B'}]}>{task.status === 'กำลังดำเนินการ' ? 'กำลังซ่อม' : task.status}</Text>
                   </View>
                 </View>
@@ -188,7 +200,7 @@ export default function AdminReviewScreen() {
         </View>
       </ScrollView>
 
-      {/* Modal รายละเอียดงานเหมือนเดิมเป๊ะ */}
+      {/* Modal รายละเอียดงาน */}
       <Modal visible={openDetail} animationType="slide" transparent={true}>
         <View style={styles.modalBg}>
           <View style={styles.detailBox}>
@@ -208,24 +220,49 @@ export default function AdminReviewScreen() {
                   </View>
                 </View>
 
+                <View style={[styles.sectionBlock, {backgroundColor: '#F9FAFB', padding: 12, borderRadius: 12, marginBottom: 20}]}>
+                    <Text style={[styles.sectionBlockTitle, {fontSize: 14}]}>📝 รายละเอียดปัญหา</Text>
+                    <Text style={{fontSize: 14, color: '#374151'}}>{selectedTask.title}</Text>
+                    <Text style={{fontSize: 12, color: '#6B7280', marginTop: 4}}>{selectedTask.detail || 'ไม่มีรายละเอียดเพิ่มเติม'}</Text>
+                </View>
+
                 <Text style={styles.sectionBlockTitle}>รูปภาพประกอบการซ่อม</Text>
                 <View style={styles.imageComparisonContainer}>
                   <View style={styles.imageBox}>
                     <Text style={styles.imageSubTitle}>ก่อนซ่อม</Text>
-                    <Image source={{ uri: selectedTask.images?.[0] || 'https://via.placeholder.com/150' }} style={styles.compareImage} />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {selectedTask.images && selectedTask.images.length > 0 ? (
+                            selectedTask.images.map((img: string, i: number) => (
+                                <Image key={i} source={{ uri: img }} style={[styles.compareImage, {marginRight: 8, width: 140}]} />
+                            ))
+                        ) : (
+                            <Image source={{ uri: 'https://via.placeholder.com/150' }} style={styles.compareImage} />
+                        )}
+                    </ScrollView>
                   </View>
                   <View style={styles.imageBox}>
                     <Text style={styles.imageSubTitle}>หลังซ่อม</Text>
-                    <Image source={{ uri: selectedTask.afterImages?.[0] || selectedTask.afterImage || 'https://via.placeholder.com/150' }} style={[styles.compareImage, {borderColor: '#10B981', borderWidth: 2}]} />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {selectedTask.afterImages && selectedTask.afterImages.length > 0 ? (
+                            selectedTask.afterImages.map((img: string, i: number) => (
+                                <Image key={i} source={{ uri: img }} style={[styles.compareImage, {marginRight: 8, width: 140, borderColor: '#10B981', borderWidth: 2}]} />
+                            ))
+                        ) : (
+                            <Image source={{ uri: selectedTask.afterImage || 'https://via.placeholder.com/150' }} style={[styles.compareImage, {borderColor: '#10B981', borderWidth: 2}]} />
+                        )}
+                    </ScrollView>
                   </View>
                 </View>
 
                 <View style={styles.sectionBlock}>
                   <Text style={styles.sectionBlockTitle}>สรุปงานจากช่าง</Text>
                   <View style={styles.noteBox}>
-                    <Text style={styles.noteText}>รายละเอียด: <Text style={{fontWeight: '500'}}>{selectedTask.action || selectedTask.closingDetail || 'ไม่มีการบันทึกรายละเอียด'}</Text></Text>
+                    <Text style={styles.noteText}>รายละเอียด: <Text style={{fontWeight: '500'}}>{selectedTask.closingDetail || selectedTask.action || 'ไม่มีการบันทึกรายละเอียด'}</Text></Text>
                     <View style={styles.dividerLine} />
-                    <Text style={[styles.noteText, {color: '#EF4444', fontWeight: '800'}]}>ค่าวัสดุอุปกรณ์: {selectedTask.cost || selectedTask.materialCost || '0'} บาท</Text>
+                    <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+                        <Text style={[styles.noteText, {color: '#6B7280'}]}>ค่าวัสดุอุปกรณ์:</Text>
+                        <Text style={{fontSize: 16, fontWeight: '800', color: '#EF4444'}}>{selectedTask.materialCost || selectedTask.cost || '0'} บาท</Text>
+                    </View>
                   </View>
                 </View>
 

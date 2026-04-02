@@ -31,6 +31,19 @@ const CATEGORIES = [
 
 const SORT_OPTIONS = ['ใหม่ล่าสุด', 'เก่าที่สุด'];
 
+// ✅ ฟังก์ชันแปลงวันที่ + เวลา (เช่น 2 เม.ย. 2569 เวลา 14:30 น.)
+const formatThaiDateTime = (dateString: string) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const d = date.getDate();
+  const m = months[date.getMonth()];
+  const y = date.getFullYear() + 543;
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${d} ${m} ${y} เวลา ${hours}:${minutes} น.`;
+};
+
 export default function TechDashboardScreen() {
   const [activeCategory, setActiveCategory] = useState('ทั้งหมด');
   const [tasks, setTasks] = useState<any[]>([]);
@@ -147,10 +160,8 @@ export default function TechDashboardScreen() {
                 <Text style={styles.offlineDesc}>
                     คุณได้ปิดสถานะการรับงานไว้ ระบบจึงไม่แสดงรายการแจ้งซ่อมใหม่ หากต้องการเริ่มงาน กรุณาเปิดสถานะที่หน้าการตั้งค่า
                 </Text>
-                {/* เอาปุ่มไปเปิดสถานะออกเรียบร้อยแล้วครับ */}
             </View>
         ) : (
-            // โชว์การ์ดงานและ Filter ตามปกติเมื่อ isAvailable เป็น true หรือ undefined
             <>
                 <View style={styles.categoryContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
@@ -207,8 +218,9 @@ export default function TechDashboardScreen() {
                                 <Ionicons name={catConfig.icon as any} size={14} color={catConfig.color} />
                                 <Text style={[styles.badgeTextCategory, { color: catConfig.color }]}>{task.category}</Text>
                                 </View>
+                                {/* ✅ โชว์ทั้งวันที่และเวลา */}
                                 <Text style={styles.timeText}>
-                                {task.createdAt ? new Date(task.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '-'} น.
+                                {task.createdAt ? formatThaiDateTime(task.createdAt) : '-'}
                                 </Text>
                             </View>
 
@@ -276,7 +288,6 @@ const styles = StyleSheet.create({
   pageHeader: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16 },
   pageTitle: { fontSize: 22, fontWeight: '800', color: '#111827' },
   
-  // Styles สำหรับหน้าออฟไลน์
   offlineContainer: { alignItems: 'center', marginTop: 80, paddingHorizontal: 20 },
   offlineTitle: { fontSize: 20, fontWeight: '800', color: '#374151', marginTop: 16 },
   offlineDesc: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 8, lineHeight: 22 },

@@ -18,10 +18,11 @@ import {
 } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
-// ✅ 1. นำเข้า addDoc, collection, serverTimestamp และ getDocs สำหรับแจ้งเตือน
 import { doc, onSnapshot, updateDoc, getDoc, addDoc, collection, serverTimestamp, getDocs, query, where } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { db } from '../../constants/firebaseConfig'; 
+// ✅ นำเข้าแค่นี้พอ ไม่ต้องใช้ FileSystem แล้ว
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from '../../constants/firebaseConfig'; 
 
 export default function TaskDetailScreen() {
     const { id } = useLocalSearchParams(); 
@@ -42,12 +43,14 @@ export default function TaskDetailScreen() {
         const docRef = doc(db, "Reports", id as string);
         const unsubscribe = onSnapshot(docRef, async (docSnap) => {
             if (docSnap.exists()) {
-                const jobData = docSnap.data();
+                const jobData: any = { id: docSnap.id, ...docSnap.data() };
                 setJob(jobData);
                 
-                const userRef = doc(db, "Users", jobData.userId);
-                const userSnap = await getDoc(userRef);
-                if (userSnap.exists()) setUserData(userSnap.data());
+                if (jobData.userId) {
+                    const userRef = doc(db, "Users", jobData.userId);
+                    const userSnap = await getDoc(userRef);
+                    if (userSnap.exists()) setUserData(userSnap.data());
+                }
             }
             setLoading(false);
         });
@@ -58,8 +61,11 @@ export default function TaskDetailScreen() {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
-            quality: 0.8,
+            aspect: [1, 1],
+            quality: 0.5,
         });
+        
+        // ✅ เก็บแค่ URI ธรรมดา ไม่ต้องใช้ Base64
         if (!result.canceled && result.assets?.length > 0) {
             setAfterImages((prev) => [...prev, result.assets[0].uri]);
         }
@@ -77,19 +83,49 @@ export default function TaskDetailScreen() {
         
         try {
             setIsSubmitting(true);
+            const uploadedImageUrls: string[] = [];
             
-            // 1. อัปเดตสถานะงานเป็นเสร็จสมบูรณ์
+            // 📸 1. อัปโหลดรูปภาพทั้งหมดเข้าโฟลเดอร์ tech_finishes ด้วย XMLHttpRequest
+            for (const uri of afterImages) {
+                try {
+                    // แปลง URI เป็นไฟล์ก้อน (Blob) ท่านี้เสถียรสุด ไม่ต้องพึ่ง FileSystem
+                    const blob: any = await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.onload = () => resolve(xhr.response);
+                        xhr.onerror = () => reject(new TypeError("Network request failed"));
+                        xhr.responseType = "blob";
+                        xhr.open("GET", uri, true);
+                        xhr.send(null);
+                    });
+                    
+                    // ระบุเป้าหมายคือ โฟลเดอร์ tech_finishes
+                    const filename = `${Date.now()}_finish_${Math.random().toString(36).substring(7)}.jpg`;
+                    const storageRef = ref(storage, `tech_finishes/${filename}`);
+                    
+                    // สั่งอัปโหลด
+                    await uploadBytes(storageRef, blob);
+                    const downloadURL = await getDownloadURL(storageRef);
+                    uploadedImageUrls.push(downloadURL); 
+                    
+                    // ปิดคืนค่า memory
+                    if (blob.close) blob.close();
+                } catch (err) {
+                    console.error("Upload Error: ", err);
+                }
+            }
+            
+            // 📝 2. อัปเดตสถานะงานลง Firestore
             const docRef = doc(db, "Reports", id as string);
             await updateDoc(docRef, {
                 status: "รอตรวจสอบ",
                 closingDetail: workDetails,
-                materialCost: materialCost,
-                afterImages: afterImages,
+                materialCost: materialCost || "0",
+                afterImages: uploadedImageUrls, // ✅ ส่ง URL กลับไปเก็บ
                 closedAt: new Date().toISOString(),
                 techId: auth.currentUser?.uid
             });
 
-            // 2. ✅ ส่งการแจ้งเตือนหานักศึกษา (ผู้แจ้งซ่อม)
+            // 🔔 3. ส่งการแจ้งเตือนหานักศึกษา
             if (job?.userId) {
                 await addDoc(collection(db, "Notifications"), {
                     targetUid: job.userId,
@@ -103,7 +139,7 @@ export default function TaskDetailScreen() {
                 });
             }
 
-            // 3. ✅ ส่งการแจ้งเตือนหา Admin (ให้รู้ว่ามีงานเสร็จ)
+            // 🔔 4. ส่งการแจ้งเตือนหา Admin
             const adminQuery = query(collection(db, "Users"), where("role", "==", "admin"));
             const adminSnapshot = await getDocs(adminQuery);
             adminSnapshot.forEach(async (adminDoc) => {
@@ -119,7 +155,7 @@ export default function TaskDetailScreen() {
                 });
             });
 
-            Alert.alert('สำเร็จ', 'ส่งงานและส่งแจ้งเตือนเรียบร้อยแล้ว', [
+            Alert.alert('สำเร็จ', 'ส่งงานรูปภาพเข้า Storage และส่งแจ้งเตือนเรียบร้อยแล้ว', [
                 { text: 'ตกลง', onPress: () => router.replace('/(technician)/(tabs)/tasks' as any) }
             ]);
         } catch (error) {
@@ -144,11 +180,12 @@ export default function TaskDetailScreen() {
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                         <Ionicons name="chevron-back" size={32} color="#F28C28" />
                     </TouchableOpacity>
+                    <Text style={{fontSize: 18, fontWeight: '800', color: DARK_TEXT}}>ปิดงานซ่อม</Text>
+                    <View style={{ width: 44 }} />
                 </View>
 
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                     
-                    {/* ... (UI ส่วนอื่นๆ คงเดิม) ... */}
                     <View style={styles.customerSection}>
                         <View style={styles.avatarCircle}><Ionicons name="person" size={40} color="#F28C28" /></View>
                         <View style={styles.inputGroup}>
@@ -250,7 +287,7 @@ const GRAY_TEXT = '#6B7280';
 
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
-    headerBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 40 : 10, paddingBottom: 10 },
+    headerBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 40 : 10, paddingBottom: 10 },
     backButton: { width: 44, height: 44, justifyContent: 'center' },
     scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
     customerSection: { alignItems: 'center', marginBottom: 24 },

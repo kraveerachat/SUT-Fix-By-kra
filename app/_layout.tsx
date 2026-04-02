@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
-
+import { Platform } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
